@@ -23,34 +23,37 @@
 ### Install
 
 ```bash
-git clone https://github.com/tsutomusaito/revi.git
+git clone https://github.com/ben-saito/revi.git
 cd revi
 bun install
+bun link    # グローバルインストール（revi コマンドが使えるようになる）
 ```
+
+これで `revi` コマンドがどのディレクトリからでも使えます。
 
 ### Usage
 
 ```bash
 # プロジェクト初期化
-bun run src/cli/index.ts init --project-dir /path/to/your/project
+revi init --project-dir /path/to/your/project
 
 # レビュー実行（現在のブランチの直前コミットとの差分）
-bun run src/cli/index.ts review --project-dir /path/to/your/project
+revi review --project-dir /path/to/your/project
 
 # mainブランチとの差分をレビュー
-bun run src/cli/index.ts review --base main --project-dir /path/to/your/project
+revi review --base main --project-dir /path/to/your/project
 
 # 特定コミットをレビュー
-bun run src/cli/index.ts review --commit abc1234 --project-dir /path/to/your/project
+revi review --commit abc1234 --project-dir /path/to/your/project
 
 # JSON出力
-bun run src/cli/index.ts review --format json --project-dir /path/to/your/project
+revi review --format json --project-dir /path/to/your/project
 
 # warning以上のみ表示
-bun run src/cli/index.ts review --severity warning --project-dir /path/to/your/project
+revi review --severity warning --project-dir /path/to/your/project
 
 # 直接API利用（APIキー必要）
-bun run src/cli/index.ts review --provider claude --project-dir /path/to/your/project
+revi review --provider claude --project-dir /path/to/your/project
 ```
 
 ## Architecture

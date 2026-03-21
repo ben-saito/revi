@@ -1,3 +1,4 @@
+#!/usr/bin/env bun
 import { Command } from "commander";
 import { reviewCommand } from "./commands/review";
 import { initCommand } from "./commands/init";

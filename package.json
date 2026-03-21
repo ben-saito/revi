@@ -2,7 +2,7 @@
   "name": "revi",
   "module": "src/cli/index.ts",
   "type": "module",
-  "private": true,
+  "private": false,
   "bin": {
     "revi": "src/cli/index.ts"
   },
