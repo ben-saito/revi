@@ -19,6 +19,7 @@ interface ReviewOptions {
   commit?: string;
   format: string;
   severity: string;
+  language?: string;
   provider?: string;
   stages?: string;
   projectDir: string;
@@ -63,6 +64,10 @@ export async function reviewCommand(opts: ReviewOptions) {
       process.exit(1);
     }
     config.review.severity_threshold = opts.severity as Severity;
+  }
+
+  if (opts.language) {
+    config.review.output_language = opts.language;
   }
 
   const stageNames = opts.stages?.split(",").map((s) => s.trim());

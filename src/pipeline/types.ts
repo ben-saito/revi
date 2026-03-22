@@ -125,6 +125,7 @@ export interface ProjectConfig {
     aspects: string[];
     severity_threshold: Severity;
     max_findings_per_file: number;
+    output_language?: string;
     rules?: {
       ignore_patterns?: string[];
       coding_standards?: string;

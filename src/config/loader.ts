@@ -76,6 +76,7 @@ stages = ["parse", "understand", "review", "integrate", "report"]
 aspects = ["correctness", "security", "performance", "maintainability"]
 severity_threshold = "suggestion"
 max_findings_per_file = 10
+# output_language = "Japanese"
 
 # [review.rules]
 # ignore_patterns = ["*.generated.ts", "vendor/**"]

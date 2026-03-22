@@ -148,6 +148,88 @@ export class Store {
     }));
   }
 
+  listReviews(limit: number): Array<{
+    id: string;
+    project: string;
+    status: string;
+    source: string;
+    base_ref: string;
+    head_ref: string;
+    created_at: string;
+    finding_count: number;
+    critical_count: number;
+    warning_count: number;
+  }> {
+    const rows = this.db
+      .prepare(
+        `SELECT r.id, r.project, r.status, r.source, r.base_ref, r.head_ref, r.created_at,
+                COUNT(f.id) as finding_count,
+                SUM(CASE WHEN f.severity = 'critical' THEN 1 ELSE 0 END) as critical_count,
+                SUM(CASE WHEN f.severity = 'warning' THEN 1 ELSE 0 END) as warning_count
+         FROM reviews r
+         LEFT JOIN findings f ON f.review_id = r.id AND f.suppressed = 0
+         GROUP BY r.id
+         ORDER BY r.created_at DESC
+         LIMIT ?`
+      )
+      .all(limit) as Record<string, unknown>[];
+
+    return rows.map((r) => ({
+      id: r.id as string,
+      project: r.project as string,
+      status: r.status as string,
+      source: r.source as string,
+      base_ref: r.base_ref as string,
+      head_ref: r.head_ref as string,
+      created_at: r.created_at as string,
+      finding_count: (r.finding_count as number) ?? 0,
+      critical_count: (r.critical_count as number) ?? 0,
+      warning_count: (r.warning_count as number) ?? 0,
+    }));
+  }
+
+  getReview(id: string): {
+    id: string;
+    project: string;
+    status: string;
+    source: string;
+    base_ref: string;
+    head_ref: string;
+    created_at: string;
+  } | null {
+    // Require at least 8 characters for prefix matching to avoid ambiguous results
+    if (id.length < 8) {
+      throw new Error(`Review ID must be at least 8 characters (got ${id.length})`);
+    }
+
+    const rows = this.db
+      .prepare(`SELECT * FROM reviews WHERE id LIKE ? || '%' LIMIT 2`)
+      .all(id) as Record<string, unknown>[];
+
+    if (rows.length === 0) return null;
+    if (rows.length > 1) {
+      throw new Error(`Ambiguous review ID "${id}" — matches multiple reviews. Use a longer prefix.`);
+    }
+
+    const row = rows[0];
+    return {
+      id: row.id as string,
+      project: row.project as string,
+      status: row.status as string,
+      source: row.source as string,
+      base_ref: row.base_ref as string,
+      head_ref: row.head_ref as string,
+      created_at: row.created_at as string,
+    };
+  }
+
+  getTokensUsed(reviewId: string): number {
+    const row = this.db
+      .prepare(`SELECT SUM(tokens_used) as total FROM pipeline_runs WHERE review_id = ?`)
+      .get(reviewId) as Record<string, unknown> | null;
+    return (row?.total as number) ?? 0;
+  }
+
   close(): void {
     this.db.close();
   }

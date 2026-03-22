@@ -1,5 +1,5 @@
 import type { Stage, StageInput, StageOutput, StageContext, Finding } from "../types";
-import { SEVERITY_ORDER, safeJsonParse, parseFinding, totalTokens } from "../../utils";
+import { SEVERITY_ORDER, safeJsonParse, parseFinding, totalTokens, withOutputLanguage } from "../../utils";
 
 export class IntegrateStage implements Stage {
   name = "integrate";
@@ -22,8 +22,10 @@ export class IntegrateStage implements Stage {
     });
 
     const result = await ctx.ai.generate({
-      system:
+      system: withOutputLanguage(
         "You are a senior reviewer consolidating findings. Deduplicate, filter false positives, and re-score severity. Respond with JSON only.",
+        ctx.config
+      ),
       messages: [{ role: "user", content: prompt }],
       response_format: "json",
       temperature: 0.1,
