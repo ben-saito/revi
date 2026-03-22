@@ -13,6 +13,7 @@ import chalk from "chalk";
 interface ReviewOptions {
   base: string;
   head: string;
+  workingTree?: boolean;
   pr?: string;
   commit?: string;
   format: string;
@@ -35,7 +36,10 @@ export async function reviewCommand(opts: ReviewOptions) {
   let base = opts.base;
   let head = opts.head;
 
-  if (opts.commit) {
+  if (opts.workingTree) {
+    base = opts.base === "HEAD~1" ? "HEAD" : opts.base; // default to HEAD for working tree
+    head = ""; // empty = diff against working tree
+  } else if (opts.commit) {
     base = `${opts.commit}~1`;
     head = opts.commit;
   }
@@ -65,7 +69,7 @@ export async function reviewCommand(opts: ReviewOptions) {
   console.log(chalk.blue("▸ Revi Review"));
   console.log(chalk.gray(`  Project:  ${config.project.name}`));
   console.log(chalk.gray(`  Provider: ${providerName}`));
-  console.log(chalk.gray(`  Diff:     ${base}..${head}`));
+  console.log(chalk.gray(`  Diff:     ${base}..${head || "(working tree)"}`));
   console.log(chalk.gray(`  Stages:   ${(stageNames ?? config.pipeline.stages).join(" → ")}`));
   console.log("");
 

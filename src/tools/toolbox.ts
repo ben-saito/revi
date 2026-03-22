@@ -9,10 +9,11 @@ export class ToolBox {
     this.repoRoot = resolve(repoRoot);
   }
 
-  /** git diff between two refs */
+  /** git diff between two refs, or against working tree if head is empty */
   gitDiff(base: string, head: string, paths?: string[]): string {
     const pathArgs = paths?.length ? ["--", ...paths] : [];
-    return this.git(["diff", base, head, ...pathArgs]);
+    const args = head ? ["diff", base, head, ...pathArgs] : ["diff", base, ...pathArgs];
+    return this.git(args);
   }
 
   /** git show a file at a specific ref */

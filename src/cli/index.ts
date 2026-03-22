@@ -15,6 +15,7 @@ program
   .description("Review code changes")
   .option("--base <ref>", "Base ref to diff against", "HEAD~1")
   .option("--head <ref>", "Head ref", "HEAD")
+  .option("--working-tree", "Review uncommitted changes against base (default: HEAD)")
   .option("--pr <number>", "GitHub PR number")
   .option("--commit <sha>", "Specific commit SHA")
   .option("--format <type>", "Output format: terminal, json, markdown", "terminal")
