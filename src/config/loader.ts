@@ -51,7 +51,7 @@ export function initProject(projectRoot: string): string {
   mkdirSync(reviDir, { recursive: true });
   mkdirSync(promptsDir, { recursive: true });
 
-  const name = guessProjectName(projectRoot);
+  const name = guessProjectName(projectRoot).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 
   const template = `[project]
 name = "${name}"

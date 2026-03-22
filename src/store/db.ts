@@ -142,7 +142,7 @@ export class Store {
       category: r.category as string as Finding["category"],
       title: r.title as string,
       description: r.description as string,
-      suggestion: r.suggestion ? JSON.parse(r.suggestion as string) : undefined,
+      suggestion: r.suggestion ? parseSuggestion(r.suggestion as string) : undefined,
       confidence: r.confidence as number,
       stage: r.stage as string,
     }));
@@ -150,5 +150,19 @@ export class Store {
 
   close(): void {
     this.db.close();
+  }
+}
+
+function parseSuggestion(raw: string): Finding["suggestion"] | undefined {
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return undefined;
+    if ("__proto__" in parsed || "constructor" in parsed || "prototype" in parsed) return undefined;
+    return {
+      description: typeof parsed.description === "string" ? parsed.description : "",
+      diff: typeof parsed.diff === "string" ? parsed.diff : undefined,
+    };
+  } catch {
+    return undefined;
   }
 }
