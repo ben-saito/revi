@@ -52,6 +52,9 @@ revi review --format json --project-dir /path/to/your/project
 # warning以上のみ表示
 revi review --severity warning --project-dir /path/to/your/project
 
+# 日本語でレビュー結果を受け取る
+revi review --language Japanese --project-dir /path/to/your/project
+
 # 直接API利用（APIキー必要）
 revi review --provider claude --project-dir /path/to/your/project
 ```
@@ -75,19 +78,19 @@ revi review --project-dir .
 
 Found 3 issue(s):
 
-● Null pointer dereference in user lookup
+● ユーザー検索時のNull参照
   src/services/user.ts:42 | critical | confidence: 0.92
-  fetchUser() returns undefined when the user is not found, but the caller
-  accesses .name without a null check. This will throw at runtime.
+  fetchUser() はユーザーが見つからない場合に undefined を返しますが、呼び出し元が
+  nullチェックなしで .name にアクセスしています。実行時に例外がスローされます。
 
-● SQL query built with string concatenation
+● SQL文の文字列結合による組み立て
   src/db/queries.ts:18 | warning | confidence: 0.88
-  User input is interpolated directly into the SQL string. Use parameterized
-  queries to prevent SQL injection.
+  ユーザー入力がSQL文字列に直接埋め込まれています。SQLインジェクション防止のため、
+  パラメータ化クエリを使用してください。
 
-● Unused import
+○ 未使用のインポート
   src/utils/helpers.ts:1 | suggestion | confidence: 0.95
-  'lodash' is imported but never used in this file.
+  'lodash' がインポートされていますが、このファイル内で使用されていません。
 
 Tokens used: 12,450
 ```
@@ -138,10 +141,10 @@ revi review --format json --project-dir .
       "line_end": 42,
       "severity": "critical",
       "category": "correctness",
-      "title": "Null pointer dereference in user lookup",
-      "description": "fetchUser() returns undefined when the user is not found, but the caller accesses .name without a null check.",
+      "title": "ユーザー検索時のNull参照",
+      "description": "fetchUser() はユーザーが見つからない場合に undefined を返しますが、呼び出し元がnullチェックなしで .name にアクセスしています。",
       "suggestion": {
-        "description": "Add a null check before accessing properties",
+        "description": "プロパティアクセス前にnullチェックを追加",
         "diff": "- const name = fetchUser(id).name;\n+ const user = fetchUser(id);\n+ if (!user) throw new Error(`User not found: ${id}`);\n+ const name = user.name;"
       },
       "confidence": 0.92,
@@ -154,10 +157,10 @@ revi review --format json --project-dir .
       "line_end": 20,
       "severity": "warning",
       "category": "security",
-      "title": "SQL query built with string concatenation",
-      "description": "User input is interpolated directly into the SQL string.",
+      "title": "SQL文の文字列結合による組み立て",
+      "description": "ユーザー入力がSQL文字列に直接埋め込まれています。",
       "suggestion": {
-        "description": "Use parameterized queries",
+        "description": "パラメータ化クエリを使用",
         "diff": "- db.query(`SELECT * FROM users WHERE id = '${userId}'`);\n+ db.query(`SELECT * FROM users WHERE id = ?`, [userId]);"
       },
       "confidence": 0.88,
@@ -189,13 +192,13 @@ Total findings: **2**
 
 ## Findings
 
-### 🔴 Null pointer dereference in user lookup
+### 🔴 ユーザー検索時のNull参照
 **critical** | correctness | `src/services/user.ts:42` | confidence: 0.92
 
-fetchUser() returns undefined when the user is not found, but the caller
-accesses .name without a null check. This will throw at runtime.
+fetchUser() はユーザーが見つからない場合に undefined を返しますが、呼び出し元が
+nullチェックなしで .name にアクセスしています。実行時に例外がスローされます。
 
-**Suggestion:** Add a null check before accessing properties
+**Suggestion:** プロパティアクセス前にnullチェックを追加
 ```diff
 - const name = fetchUser(id).name;
 + const user = fetchUser(id);
@@ -205,12 +208,12 @@ accesses .name without a null check. This will throw at runtime.
 
 ---
 
-### 🟡 SQL query built with string concatenation
+### 🟡 SQL文の文字列結合による組み立て
 **warning** | security | `src/db/queries.ts:18-20` | confidence: 0.88
 
-User input is interpolated directly into the SQL string.
+ユーザー入力がSQL文字列に直接埋め込まれています。
 
-**Suggestion:** Use parameterized queries
+**Suggestion:** パラメータ化クエリを使用
 ```diff
 - db.query(`SELECT * FROM users WHERE id = '${userId}'`);
 + db.query(`SELECT * FROM users WHERE id = ?`, [userId]);
@@ -270,6 +273,7 @@ stages = ["parse", "understand", "review", "integrate", "report"]
 aspects = ["correctness", "security", "performance", "maintainability"]
 severity_threshold = "suggestion"
 max_findings_per_file = 10
+# output_language = "Japanese"  # レビュー結果の言語（未設定時は英語）
 
 [rate_limit]
 max_reviews_per_hour = 10
