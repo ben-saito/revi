@@ -35,6 +35,8 @@ export class ClaudeCodeProvider implements AiProvider {
       args.push("--allowedTools", this.allowedTools.join(","));
     }
 
+    args.push("--disallowedTools", "Bash,Write,Edit,WebFetch,WebSearch");
+
     const proc = Bun.spawn(args, {
       stdout: "pipe",
       stderr: "pipe",

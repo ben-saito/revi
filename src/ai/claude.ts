@@ -1,6 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { AiProvider, GenerateParams, GenerateResult } from "./provider";
 
+const ALLOWED_API_KEY_ENVS = new Set([
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_API_KEY_REVI",
+  "CLAUDE_API_KEY",
+]);
+
 export class ClaudeProvider implements AiProvider {
   name = "claude";
   private client: Anthropic;
@@ -8,6 +14,9 @@ export class ClaudeProvider implements AiProvider {
 
   constructor(config: Record<string, unknown> = {}) {
     const apiKeyEnv = (config.api_key_env as string) ?? "ANTHROPIC_API_KEY";
+    if (!ALLOWED_API_KEY_ENVS.has(apiKeyEnv)) {
+      throw new Error(`Disallowed api_key_env: ${apiKeyEnv}. Allowed: ${[...ALLOWED_API_KEY_ENVS].join(", ")}`);
+    }
     this.client = new Anthropic({ apiKey: process.env[apiKeyEnv] });
     this.model = (config.model as string) ?? "claude-sonnet-4-20250514";
   }

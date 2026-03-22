@@ -56,6 +56,181 @@ revi review --severity warning --project-dir /path/to/your/project
 revi review --provider claude --project-dir /path/to/your/project
 ```
 
+## Output Examples
+
+Revi は 3 つの出力形式をサポートしています。
+
+### Terminal (デフォルト)
+
+```bash
+revi review --project-dir .
+```
+
+```
+▸ Revi Review
+  Project:  my-app
+  Provider: claude-code
+  Diff:     HEAD~1..HEAD
+  Stages:   parse → understand → review → integrate → report
+
+Found 3 issue(s):
+
+● Null pointer dereference in user lookup
+  src/services/user.ts:42 | critical | confidence: 0.92
+  fetchUser() returns undefined when the user is not found, but the caller
+  accesses .name without a null check. This will throw at runtime.
+
+● SQL query built with string concatenation
+  src/db/queries.ts:18 | warning | confidence: 0.88
+  User input is interpolated directly into the SQL string. Use parameterized
+  queries to prevent SQL injection.
+
+● Unused import
+  src/utils/helpers.ts:1 | suggestion | confidence: 0.95
+  'lodash' is imported but never used in this file.
+
+Tokens used: 12,450
+```
+
+問題がない場合:
+
+```
+▸ Revi Review
+  Project:  my-app
+  Provider: claude-code
+  Diff:     HEAD~1..HEAD
+  Stages:   parse → understand → review → integrate → report
+
+✓ No issues found
+  Tokens used: 8,230
+```
+
+### JSON
+
+```bash
+revi review --format json --project-dir .
+```
+
+```json
+{
+  "review_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "project": "my-app",
+  "ref": "HEAD~1..HEAD",
+  "timestamp": "2026-03-22T18:30:00.000Z",
+  "summary": {
+    "total": 2,
+    "by_severity": {
+      "critical": 1,
+      "warning": 1,
+      "suggestion": 0,
+      "info": 0
+    },
+    "by_category": {
+      "correctness": 1,
+      "security": 1
+    }
+  },
+  "findings": [
+    {
+      "id": "f1a2b3c4-...",
+      "file": "src/services/user.ts",
+      "line_start": 42,
+      "line_end": 42,
+      "severity": "critical",
+      "category": "correctness",
+      "title": "Null pointer dereference in user lookup",
+      "description": "fetchUser() returns undefined when the user is not found, but the caller accesses .name without a null check.",
+      "suggestion": {
+        "description": "Add a null check before accessing properties",
+        "diff": "- const name = fetchUser(id).name;\n+ const user = fetchUser(id);\n+ if (!user) throw new Error(`User not found: ${id}`);\n+ const name = user.name;"
+      },
+      "confidence": 0.92,
+      "stage": "review"
+    },
+    {
+      "id": "e5f6a7b8-...",
+      "file": "src/db/queries.ts",
+      "line_start": 18,
+      "line_end": 20,
+      "severity": "warning",
+      "category": "security",
+      "title": "SQL query built with string concatenation",
+      "description": "User input is interpolated directly into the SQL string.",
+      "suggestion": {
+        "description": "Use parameterized queries",
+        "diff": "- db.query(`SELECT * FROM users WHERE id = '${userId}'`);\n+ db.query(`SELECT * FROM users WHERE id = ?`, [userId]);"
+      },
+      "confidence": 0.88,
+      "stage": "review"
+    }
+  ]
+}
+```
+
+### Markdown
+
+```bash
+revi review --format markdown --project-dir .
+```
+
+````markdown
+# Revi Review Report
+**Project:** my-app
+**Ref:** HEAD~1..HEAD
+**Date:** 2026-03-22T18:30:00.000Z
+
+## Summary
+Total findings: **2**
+
+| Severity | Count |
+|----------|-------|
+| 🔴 critical | 1 |
+| 🟡 warning | 1 |
+
+## Findings
+
+### 🔴 Null pointer dereference in user lookup
+**critical** | correctness | `src/services/user.ts:42` | confidence: 0.92
+
+fetchUser() returns undefined when the user is not found, but the caller
+accesses .name without a null check. This will throw at runtime.
+
+**Suggestion:** Add a null check before accessing properties
+```diff
+- const name = fetchUser(id).name;
++ const user = fetchUser(id);
++ if (!user) throw new Error(`User not found: ${id}`);
++ const name = user.name;
+```
+
+---
+
+### 🟡 SQL query built with string concatenation
+**warning** | security | `src/db/queries.ts:18-20` | confidence: 0.88
+
+User input is interpolated directly into the SQL string.
+
+**Suggestion:** Use parameterized queries
+```diff
+- db.query(`SELECT * FROM users WHERE id = '${userId}'`);
++ db.query(`SELECT * FROM users WHERE id = ?`, [userId]);
+```
+
+---
+````
+
+### Severity フィルタ
+
+`--severity` で表示する最小レベルを指定できます:
+
+```bash
+# warning 以上（critical + warning）のみ表示
+revi review --severity warning --project-dir .
+
+# critical のみ表示
+revi review --severity critical --project-dir .
+```
+
 ## Architecture
 
 ```

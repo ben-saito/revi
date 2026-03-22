@@ -1,6 +1,14 @@
 import { spawnSync } from "child_process";
-import { resolve, relative, extname, basename } from "path";
-import { readFileSync, readdirSync } from "fs";
+import { resolve, relative, extname, basename, sep } from "path";
+import { readFileSync, readdirSync, realpathSync } from "fs";
+
+const SAFE_REF_PATTERN = /^[a-zA-Z0-9._~\-\/^@{}:]+$/;
+
+function validateRef(ref: string): void {
+  if (ref && !SAFE_REF_PATTERN.test(ref)) {
+    throw new Error(`Invalid git ref: ${ref}`);
+  }
+}
 
 const LANG_MAP: Record<string, string> = {
   ts: "typescript",
@@ -38,17 +46,20 @@ export class ToolBox {
   }
 
   gitDiff(base: string, head: string, paths?: string[]): string {
+    validateRef(base);
+    validateRef(head);
     const pathArgs = paths?.length ? ["--", ...paths] : [];
     const args = head ? ["diff", base, head, ...pathArgs] : ["diff", base, ...pathArgs];
     return this.git(args);
   }
 
   gitShow(ref: string, path: string): string {
+    validateRef(ref);
     return this.git(["show", `${ref}:${path}`]);
   }
 
   gitBlame(path: string, lineStart?: number, lineEnd?: number): string {
-    const args = ["blame", path];
+    const args = ["blame", "--", path];
     if (lineStart && lineEnd) {
       args.push(`-L${lineStart},${lineEnd}`);
     }
@@ -56,14 +67,15 @@ export class ToolBox {
   }
 
   gitLog(ref?: string, maxCount = 20): string {
+    if (ref) validateRef(ref);
     const args = ["log", "--oneline", `-n${maxCount}`];
     if (ref) args.push(ref);
     return this.git(args);
   }
 
   gitGrep(pattern: string, paths?: string[]): string {
-    const args = ["grep", "-n", pattern];
-    if (paths?.length) args.push("--", ...paths);
+    const args = ["grep", "-n", "-F", "--", pattern];
+    if (paths?.length) args.push(...paths);
     try {
       return this.git(args);
     } catch {
@@ -119,6 +131,12 @@ export class ToolBox {
     const rel = relative(this.repoRoot, full);
     if (rel.startsWith("..") || rel.startsWith("/")) {
       throw new Error(`Path traversal blocked: ${path}`);
+    }
+    // シンボリックリンク経由のパストラバーサルを防止
+    const realRoot = realpathSync(this.repoRoot);
+    const realFull = realpathSync(full);
+    if (!realFull.startsWith(realRoot + sep) && realFull !== realRoot) {
+      throw new Error(`Path traversal via symlink blocked: ${path}`);
     }
     return full;
   }

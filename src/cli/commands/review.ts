@@ -8,6 +8,7 @@ import { Store } from "../../store/db";
 import { PipelineEngine } from "../../pipeline/engine";
 import { buildReport, formatMarkdown } from "../../pipeline/stages/report";
 import type { ReviewMeta, Severity } from "../../pipeline/types";
+import { SEVERITY_ORDER } from "../../utils";
 import chalk from "chalk";
 
 interface ReviewOptions {
@@ -57,6 +58,10 @@ export async function reviewCommand(opts: ReviewOptions) {
   };
 
   if (opts.severity) {
+    if (!SEVERITY_ORDER.includes(opts.severity as Severity)) {
+      console.error(chalk.red(`✗ Invalid severity: ${opts.severity}. Must be one of: ${SEVERITY_ORDER.join(", ")}`));
+      process.exit(1);
+    }
     config.review.severity_threshold = opts.severity as Severity;
   }
 
