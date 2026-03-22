@@ -1,5 +1,5 @@
-import { readFileSync, existsSync, writeFileSync, mkdirSync } from "fs";
-import { resolve, join } from "path";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
+import { resolve, join, basename } from "path";
 import type { ProjectConfig, Severity } from "../pipeline/types";
 
 const DEFAULT_CONFIG: ProjectConfig = {
@@ -30,14 +30,13 @@ const DEFAULT_CONFIG: ProjectConfig = {
 export function loadConfig(projectRoot: string): ProjectConfig {
   const configPath = resolve(projectRoot, ".revi", "config.toml");
 
-  if (!existsSync(configPath)) {
+  try {
+    const raw = readFileSync(configPath, "utf-8");
+    const parsed = parseSimpleToml(raw);
+    return deepMerge(DEFAULT_CONFIG, parsed) as ProjectConfig;
+  } catch {
     return { ...DEFAULT_CONFIG, project: { ...DEFAULT_CONFIG.project, name: guessProjectName(projectRoot) } };
   }
-
-  const raw = readFileSync(configPath, "utf-8");
-  const parsed = parseSimpleToml(raw);
-
-  return deepMerge(DEFAULT_CONFIG, parsed) as ProjectConfig;
 }
 
 export function initProject(projectRoot: string): string {
@@ -95,16 +94,11 @@ max_concurrent_reviews = 2
 }
 
 function guessProjectName(root: string): string {
-  // package.json から
-  const pkgPath = join(root, "package.json");
-  if (existsSync(pkgPath)) {
-    try {
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
-      if (pkg.name) return pkg.name;
-    } catch {}
-  }
-  // ディレクトリ名
-  return root.split("/").pop() ?? "project";
+  try {
+    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf-8"));
+    if (pkg.name) return pkg.name;
+  } catch {}
+  return basename(root) || "project";
 }
 
 /** 簡易 TOML パーサ（ネストテーブル・配列・基本型対応） */

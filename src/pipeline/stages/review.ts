@@ -1,4 +1,3 @@
-import { randomUUID } from "crypto";
 import type {
   Stage,
   StageInput,
@@ -7,6 +6,7 @@ import type {
   Finding,
   ParsedDiff,
 } from "../types";
+import { safeJsonParse, parseFinding, totalTokens } from "../../utils";
 
 export class ReviewStage implements Stage {
   name = "review";
@@ -14,49 +14,45 @@ export class ReviewStage implements Stage {
 
   async run(input: StageInput, ctx: StageContext): Promise<StageOutput> {
     const parsed = input.previous?.data.parsed as ParsedDiff;
-    const understanding = input.previous?.data.understanding as Record<string, unknown>;
     if (!parsed) throw new Error("Parsed diff required");
 
-    const aspects = ctx.config.review.aspects;
-    const allConcerns: Finding[] = [];
-    let totalTokens = 0;
+    // Read coding standards once, not per-aspect
+    let codingStandards = "";
+    if (ctx.config.review.rules?.coding_standards) {
+      try {
+        codingStandards = ctx.tools.readFile(ctx.config.review.rules.coding_standards);
+      } catch {}
+    }
 
-    // 各観点で並列にレビュー実行
+    const aspects = ctx.config.review.aspects;
     const results = await Promise.all(
-      aspects.map((aspect) => this.reviewAspect(aspect, parsed, understanding, ctx))
+      aspects.map((aspect) =>
+        this.reviewAspect(aspect, parsed, codingStandards, ctx)
+      )
     );
 
-    for (const result of results) {
-      allConcerns.push(...result.findings);
-      totalTokens += result.tokens;
+    const allConcerns: Finding[] = [];
+    let tokens = 0;
+    for (const r of results) {
+      allConcerns.push(...r.findings);
+      tokens += r.tokens;
     }
 
     return {
       stage: this.name,
-      data: { parsed, understanding, concerns: allConcerns },
+      data: { parsed, concerns: allConcerns },
       findings: allConcerns,
-      tokens_used: totalTokens,
+      tokens_used: tokens,
     };
   }
 
   private async reviewAspect(
     aspect: string,
     parsed: ParsedDiff,
-    understanding: Record<string, unknown> | undefined,
+    codingStandards: string,
     ctx: StageContext
   ): Promise<{ findings: Finding[]; tokens: number }> {
-    // コーディング規約の読み込み
-    let codingStandards = "";
-    if (ctx.config.review.rules?.coding_standards) {
-      try {
-        codingStandards = ctx.tools.readFile(ctx.config.review.rules.coding_standards);
-      } catch {
-        // 規約ファイルなし
-      }
-    }
-
-    const promptName = `review/${aspect}`;
-    const prompt = ctx.prompts.render(promptName, {
+    const prompt = ctx.prompts.render(`review/${aspect}`, {
       project_name: ctx.config.project.name,
       language: parsed.summary.languages.join(", "),
       coding_standards: codingStandards,
@@ -75,31 +71,14 @@ export class ReviewStage implements Stage {
       temperature: 0.2,
     });
 
-    let concerns: Finding[] = [];
-    try {
-      const raw = JSON.parse(result.content);
-      const arr = Array.isArray(raw) ? raw : raw.concerns ?? [];
-      concerns = arr.map((c: Record<string, unknown>) => ({
-        id: randomUUID(),
-        file: c.file as string,
-        line_start: c.line_start as number | undefined,
-        line_end: c.line_end as number | undefined,
-        severity: c.severity as Finding["severity"],
-        category: (c.category as Finding["category"]) ?? aspect,
-        title: c.title as string,
-        description: c.description as string,
-        suggestion: c.suggestion as Finding["suggestion"],
-        confidence: (c.confidence as number) ?? 0.5,
-        stage: this.name,
-        aspect,
-      }));
-    } catch {
-      // JSON解析失敗時は空
-    }
+    const raw = safeJsonParse<unknown>(result.content, []);
+    const arr = Array.isArray(raw)
+      ? raw
+      : (raw as Record<string, unknown>).concerns ?? [];
+    const concerns = (arr as Record<string, unknown>[]).map((c) =>
+      parseFinding(c, { stage: this.name, aspect, category: aspect as Finding["category"] })
+    );
 
-    return {
-      findings: concerns,
-      tokens: result.tokens_used.input + result.tokens_used.output,
-    };
+    return { findings: concerns, tokens: totalTokens(result) };
   }
 }

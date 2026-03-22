@@ -1,4 +1,3 @@
-import { randomUUID } from "crypto";
 import type {
   Stage,
   StageInput,
@@ -62,17 +61,14 @@ function parseDiff(raw: string, ctx: StageContext): ParsedDiff {
     const newPath = headerMatch[2];
     const path = newPath;
 
-    // change type
     let change_type: FileChange["change_type"] = "modified";
     if (block.includes("new file mode")) change_type = "added";
     else if (block.includes("deleted file mode")) change_type = "deleted";
     else if (oldPath !== newPath) change_type = "renamed";
 
-    // language
     const language = ctx.tools.detectLanguage(path);
     if (language !== "unknown") languages.add(language);
 
-    // hunks
     const hunks: Hunk[] = [];
     const hunkRegex = /^@@\s+-(\d+),?(\d*)\s+\+(\d+),?(\d*)\s+@@(.*)/gm;
     let match;

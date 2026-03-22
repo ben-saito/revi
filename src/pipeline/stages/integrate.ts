@@ -1,5 +1,5 @@
-import { randomUUID } from "crypto";
 import type { Stage, StageInput, StageOutput, StageContext, Finding } from "../types";
+import { SEVERITY_ORDER, safeJsonParse, parseFinding, totalTokens } from "../../utils";
 
 export class IntegrateStage implements Stage {
   name = "integrate";
@@ -29,40 +29,30 @@ export class IntegrateStage implements Stage {
       temperature: 0.1,
     });
 
-    let findings: Finding[] = [];
-    let suppressed: unknown[] = [];
+    const parsed = safeJsonParse<{ findings?: unknown[]; suppressed?: unknown[] }>(
+      result.content,
+      {}
+    );
 
-    try {
-      const parsed = JSON.parse(result.content);
-      findings = (parsed.findings ?? []).map((f: Record<string, unknown>) => ({
-        id: randomUUID(),
-        file: f.file as string,
-        line_start: f.line_start as number | undefined,
-        line_end: f.line_end as number | undefined,
-        severity: f.severity as Finding["severity"],
-        category: f.category as Finding["category"],
-        title: f.title as string,
-        description: f.description as string,
-        suggestion: f.suggestion as Finding["suggestion"],
-        confidence: (f.confidence as number) ?? 0.5,
-        stage: this.name,
-        aspect: f.aspect as string | undefined,
-      }));
-      suppressed = parsed.suppressed ?? [];
-    } catch {
-      // 解析失敗時はフィルタなしで通す
+    let findings: Finding[];
+    if (parsed.findings) {
+      findings = (parsed.findings as Record<string, unknown>[]).map((f) =>
+        parseFinding(f, { stage: this.name })
+      );
+    } else {
       findings = concerns;
     }
 
-    // severity threshold でフィルタ
+    const suppressed = parsed.suppressed ?? [];
+
+    // severity threshold filter
     const threshold = ctx.config.review.severity_threshold;
-    const order = ["critical", "warning", "suggestion", "info"];
-    const maxIdx = order.indexOf(threshold);
+    const maxIdx = SEVERITY_ORDER.indexOf(threshold);
     const filtered = findings.filter(
-      (f) => order.indexOf(f.severity) <= maxIdx
+      (f) => SEVERITY_ORDER.indexOf(f.severity) <= maxIdx
     );
 
-    // max_findings_per_file でキャップ
+    // max_findings_per_file cap
     const perFile = new Map<string, Finding[]>();
     for (const f of filtered) {
       const arr = perFile.get(f.file) ?? [];
@@ -72,9 +62,8 @@ export class IntegrateStage implements Stage {
 
     const capped: Finding[] = [];
     for (const [, arr] of perFile) {
-      // severity 順でソートして上位N件
       arr.sort(
-        (a, b) => order.indexOf(a.severity) - order.indexOf(b.severity)
+        (a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity)
       );
       capped.push(...arr.slice(0, ctx.config.review.max_findings_per_file));
     }
@@ -83,7 +72,7 @@ export class IntegrateStage implements Stage {
       stage: this.name,
       data: { findings: capped, suppressed },
       findings: capped,
-      tokens_used: result.tokens_used.input + result.tokens_used.output,
+      tokens_used: totalTokens(result),
     };
   }
 }

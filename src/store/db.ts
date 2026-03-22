@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import type { Finding, ReviewMeta, Severity } from "../pipeline/types";
+import { SEVERITY_ORDER, type ReviewStatus } from "../utils";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS reviews (
@@ -70,7 +71,7 @@ export class Store {
       );
   }
 
-  updateReviewStatus(id: string, status: string): void {
+  updateReviewStatus(id: string, status: ReviewStatus): void {
     this.db
       .prepare(`UPDATE reviews SET status = ?, updated_at = datetime('now') WHERE id = ?`)
       .run(status, id);
@@ -118,7 +119,7 @@ export class Store {
   }
 
   getFindings(reviewId: string, minSeverity?: Severity): Finding[] {
-    const severityOrder: Severity[] = ["critical", "warning", "suggestion", "info"];
+    const severityOrder = SEVERITY_ORDER;
     let query = `SELECT * FROM findings WHERE review_id = ? AND suppressed = 0`;
     const params: unknown[] = [reviewId];
 
