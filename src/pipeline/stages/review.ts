@@ -6,7 +6,7 @@ import type {
   Finding,
   ParsedDiff,
 } from "../types";
-import { safeJsonParse, parseFinding, totalTokens } from "../../utils";
+import { safeJsonParse, parseFinding, totalTokens, withOutputLanguage } from "../../utils";
 
 export class ReviewStage implements Stage {
   name = "review";
@@ -65,7 +65,10 @@ export class ReviewStage implements Stage {
     });
 
     const result = await ctx.ai.generate({
-      system: `You are a code reviewer specializing in ${aspect}. Respond with a JSON array of concerns only.`,
+      system: withOutputLanguage(
+        `You are a code reviewer specializing in ${aspect}. Respond with a JSON array of concerns only.`,
+        ctx.config
+      ),
       messages: [{ role: "user", content: prompt }],
       response_format: "json",
       temperature: 0.2,

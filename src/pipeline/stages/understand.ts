@@ -26,8 +26,7 @@ export class UnderstandStage implements Stage {
     });
 
     const result = await ctx.ai.generate({
-      system:
-        "You are a code analysis expert. Analyze changes and respond with structured JSON.",
+      system: "You are a code analysis expert. Analyze changes and respond with structured JSON.",
       messages: [{ role: "user", content: prompt }],
       response_format: "json",
       temperature: 0.1,

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import type { Finding, Severity } from "./pipeline/types";
+import type { Finding, Severity, ProjectConfig } from "./pipeline/types";
 import type { GenerateResult } from "./ai/provider";
 
 // --- Severity ---
@@ -22,6 +22,25 @@ export function safeJsonParse<T>(content: string, fallback: T): T {
 
 export function totalTokens(result: GenerateResult): number {
   return result.tokens_used.input + result.tokens_used.output;
+}
+
+// --- Output language ---
+
+const ALLOWED_LANGUAGES: ReadonlySet<string> = new Set([
+  "Japanese", "Chinese", "Korean", "Spanish", "French", "German",
+  "Portuguese", "Italian", "Russian", "Arabic", "Hindi", "Thai",
+  "Vietnamese", "Indonesian", "Malay", "Dutch", "Swedish", "Polish",
+  "Turkish", "Czech", "Danish", "Finnish", "Norwegian", "Greek",
+  "Hebrew", "Hungarian", "Romanian", "Ukrainian", "English",
+]);
+
+export function withOutputLanguage(system: string, config: ProjectConfig): string {
+  const lang = config.review.output_language;
+  if (!lang) return system;
+  if (!ALLOWED_LANGUAGES.has(lang)) {
+    throw new Error(`Unsupported language: "${lang}". Supported: ${[...ALLOWED_LANGUAGES].join(", ")}`);
+  }
+  return `${system}\n\nIMPORTANT: Write all human-readable text (title, description, suggestion) in ${lang}. Keep JSON keys, JSON enum values, file paths, and code in English.`;
 }
 
 // --- Finding parsing ---
