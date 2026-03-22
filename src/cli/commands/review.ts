@@ -6,8 +6,8 @@ import { ToolBox } from "../../tools/toolbox";
 import { PromptRegistry } from "../../prompts/registry";
 import { Store } from "../../store/db";
 import { PipelineEngine } from "../../pipeline/engine";
-import { formatMarkdown } from "../../pipeline/stages/report";
-import type { ReviewMeta, Severity, ReviewReport } from "../../pipeline/types";
+import { buildReport, formatMarkdown } from "../../pipeline/stages/report";
+import type { ReviewMeta, Severity } from "../../pipeline/types";
 import chalk from "chalk";
 
 interface ReviewOptions {
@@ -27,18 +27,16 @@ export async function reviewCommand(opts: ReviewOptions) {
   const root = resolve(opts.projectDir);
   const config = loadConfig(root);
 
-  // Provider override
   const providerName = opts.provider ?? config.provider.default;
   const providerConfig = (config.provider[providerName] as Record<string, unknown>) ?? {};
   const ai = await createProvider(providerName, providerConfig);
 
-  // Base/head resolution
   let base = opts.base;
   let head = opts.head;
 
   if (opts.workingTree) {
-    base = opts.base === "HEAD~1" ? "HEAD" : opts.base; // default to HEAD for working tree
-    head = ""; // empty = diff against working tree
+    base = opts.base === "HEAD~1" ? "HEAD" : opts.base;
+    head = "";
   } else if (opts.commit) {
     base = `${opts.commit}~1`;
     head = opts.commit;
@@ -58,12 +56,10 @@ export async function reviewCommand(opts: ReviewOptions) {
     ref_id: opts.pr ?? undefined,
   };
 
-  // Severity override
   if (opts.severity) {
     config.review.severity_threshold = opts.severity as Severity;
   }
 
-  // Stage override
   const stageNames = opts.stages?.split(",").map((s) => s.trim());
 
   console.log(chalk.blue("▸ Revi Review"));
@@ -73,32 +69,22 @@ export async function reviewCommand(opts: ReviewOptions) {
   console.log(chalk.gray(`  Stages:   ${(stageNames ?? config.pipeline.stages).join(" → ")}`));
   console.log("");
 
-  const engine = new PipelineEngine({
-    ai,
-    tools,
-    prompts,
-    config,
-    store,
-  });
+  const engine = new PipelineEngine({ ai, tools, prompts, config, store });
 
   try {
     const result = await engine.run(review, stageNames);
-    const report = result.findings.length > 0
-      ? buildQuickReport(review, config.project.name, result.findings)
-      : null;
 
-    // 出力
     switch (opts.format) {
-      case "json":
-        console.log(JSON.stringify(report ?? { findings: [] }, null, 2));
+      case "json": {
+        const report = buildReport(review, config.project.name, result.findings);
+        console.log(JSON.stringify(report, null, 2));
         break;
-      case "markdown":
-        if (report) {
-          console.log(formatMarkdown(report));
-        } else {
-          console.log("No issues found. ✅");
-        }
+      }
+      case "markdown": {
+        const report = buildReport(review, config.project.name, result.findings);
+        console.log(formatMarkdown(report));
         break;
+      }
       default:
         printTerminal(result.findings, result.tokens_used);
         break;
@@ -111,7 +97,10 @@ export async function reviewCommand(opts: ReviewOptions) {
   }
 }
 
-function printTerminal(findings: Array<{ severity: string; title: string; file: string; line_start?: number; description: string; confidence: number }>, tokensUsed: number) {
+function printTerminal(
+  findings: Array<{ severity: string; title: string; file: string; line_start?: number; description: string; confidence: number }>,
+  tokensUsed: number
+) {
   if (findings.length === 0) {
     console.log(chalk.green("✓ No issues found"));
     console.log(chalk.gray(`  Tokens used: ${tokensUsed.toLocaleString()}`));
@@ -137,25 +126,4 @@ function printTerminal(findings: Array<{ severity: string; title: string; file: 
   }
 
   console.log(chalk.gray(`Tokens used: ${tokensUsed.toLocaleString()}`));
-}
-
-function buildQuickReport(review: ReviewMeta, project: string, findings: Array<{ severity: string; category: string; [k: string]: unknown }>): ReviewReport {
-  const bySeverity: Record<string, number> = {};
-  const byCategory: Record<string, number> = {};
-  for (const f of findings) {
-    bySeverity[f.severity] = (bySeverity[f.severity] ?? 0) + 1;
-    byCategory[f.category] = (byCategory[f.category] ?? 0) + 1;
-  }
-  return {
-    review_id: review.id,
-    project,
-    ref: review.ref_id ?? `${review.base_ref}..${review.head_ref}`,
-    timestamp: new Date().toISOString(),
-    summary: {
-      total: findings.length,
-      by_severity: bySeverity as Record<Severity, number>,
-      by_category: byCategory,
-    },
-    findings: findings as ReviewReport["findings"],
-  };
 }

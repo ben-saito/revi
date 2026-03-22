@@ -14,8 +14,7 @@ export class ReportStage implements Stage {
 
   async run(input: StageInput, ctx: StageContext): Promise<StageOutput> {
     const findings = input.previous?.data.findings as Finding[] ?? input.accumulated;
-
-    const report = buildReport(input.review.id, ctx.config.project.name, input.review, findings);
+    const report = buildReport(input.review, ctx.config.project.name, findings);
 
     return {
       stage: this.name,
@@ -25,10 +24,9 @@ export class ReportStage implements Stage {
   }
 }
 
-function buildReport(
-  reviewId: string,
+export function buildReport(
+  review: { id: string; base_ref: string; head_ref: string; ref_id?: string },
   project: string,
-  review: { base_ref: string; head_ref: string; ref_id?: string },
   findings: Finding[]
 ): ReviewReport {
   const bySeverity: Record<Severity, number> = {
@@ -45,7 +43,7 @@ function buildReport(
   }
 
   return {
-    review_id: reviewId,
+    review_id: review.id,
     project,
     ref: review.ref_id ?? `${review.base_ref}..${review.head_ref}`,
     timestamp: new Date().toISOString(),
@@ -58,7 +56,15 @@ function buildReport(
   };
 }
 
-/** Markdown形式のレポート生成 */
+function severityIcon(severity: string): string {
+  switch (severity) {
+    case "critical": return "🔴";
+    case "warning": return "🟡";
+    case "suggestion": return "🔵";
+    default: return "⚪";
+  }
+}
+
 export function formatMarkdown(report: ReviewReport): string {
   const lines: string[] = [];
 
@@ -68,7 +74,6 @@ export function formatMarkdown(report: ReviewReport): string {
   lines.push(`**Date:** ${report.timestamp}`);
   lines.push("");
 
-  // サマリ
   lines.push(`## Summary`);
   lines.push(`Total findings: **${report.summary.total}**`);
   lines.push("");
@@ -76,19 +81,16 @@ export function formatMarkdown(report: ReviewReport): string {
   lines.push("|----------|-------|");
   for (const [sev, count] of Object.entries(report.summary.by_severity)) {
     if (count > 0) {
-      const icon =
-        sev === "critical" ? "🔴" : sev === "warning" ? "🟡" : sev === "suggestion" ? "🔵" : "⚪";
-      lines.push(`| ${icon} ${sev} | ${count} |`);
+      lines.push(`| ${severityIcon(sev)} ${sev} | ${count} |`);
     }
   }
   lines.push("");
 
   if (report.findings.length === 0) {
-    lines.push("No issues found. ✅");
+    lines.push("No issues found.");
     return lines.join("\n");
   }
 
-  // Findings
   lines.push(`## Findings`);
   lines.push("");
 
@@ -96,16 +98,8 @@ export function formatMarkdown(report: ReviewReport): string {
     const loc = f.line_start
       ? `${f.file}:${f.line_start}${f.line_end ? `-${f.line_end}` : ""}`
       : f.file;
-    const icon =
-      f.severity === "critical"
-        ? "🔴"
-        : f.severity === "warning"
-          ? "🟡"
-          : f.severity === "suggestion"
-            ? "🔵"
-            : "⚪";
 
-    lines.push(`### ${icon} ${f.title}`);
+    lines.push(`### ${severityIcon(f.severity)} ${f.title}`);
     lines.push(`**${f.severity}** | ${f.category} | \`${loc}\` | confidence: ${f.confidence}`);
     lines.push("");
     lines.push(f.description);

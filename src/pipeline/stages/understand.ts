@@ -1,4 +1,5 @@
 import type { Stage, StageInput, StageOutput, StageContext, ParsedDiff } from "../types";
+import { safeJsonParse, totalTokens } from "../../utils";
 
 export class UnderstandStage implements Stage {
   name = "understand";
@@ -8,7 +9,6 @@ export class UnderstandStage implements Stage {
     const parsed = input.previous?.data.parsed as ParsedDiff;
     if (!parsed) throw new Error("Parse stage output required");
 
-    // コミットメッセージ取得
     let commitMessage = "";
     try {
       commitMessage = ctx.tools.gitLog(input.review.head_ref, 1);
@@ -33,23 +33,18 @@ export class UnderstandStage implements Stage {
       temperature: 0.1,
     });
 
-    let understanding: Record<string, unknown>;
-    try {
-      understanding = JSON.parse(result.content);
-    } catch {
-      understanding = {
-        intent: "Unable to parse",
-        change_type: "unknown",
-        risk_areas: [],
-        focus_points: [],
-      };
-    }
+    const understanding = safeJsonParse(result.content, {
+      intent: "Unable to parse",
+      change_type: "unknown",
+      risk_areas: [],
+      focus_points: [],
+    });
 
     return {
       stage: this.name,
       data: { parsed, understanding },
       findings: [],
-      tokens_used: result.tokens_used.input + result.tokens_used.output,
+      tokens_used: totalTokens(result),
     };
   }
 }

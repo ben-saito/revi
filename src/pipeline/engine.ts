@@ -6,7 +6,6 @@ import type {
   StageOutput,
   ReviewMeta,
   Finding,
-  ProjectConfig,
 } from "./types";
 import { RateLimiter } from "../ai/rate-limiter";
 
@@ -65,7 +64,7 @@ export class PipelineEngine {
         if (stage.name === "integrate" || stage.name === "report") {
           accumulated = output.findings;
         } else {
-          accumulated = [...accumulated, ...output.findings];
+          accumulated.push(...output.findings);
         }
         totalTokens += output.tokens_used ?? 0;
         previous = output;

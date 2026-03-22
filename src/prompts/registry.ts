@@ -1,5 +1,6 @@
-import { readFileSync, existsSync } from "fs";
+import { readFileSync } from "fs";
 import { resolve, join } from "path";
+import { homedir } from "os";
 import Handlebars from "handlebars";
 
 const BUILTIN_PROMPTS: Record<string, string> = {
@@ -133,12 +134,7 @@ export class PromptRegistry {
 
   constructor(projectDir?: string) {
     this.projectDir = projectDir;
-    this.userDir = join(
-      process.env.HOME ?? process.env.USERPROFILE ?? ".",
-      ".config",
-      "revi",
-      "prompts"
-    );
+    this.userDir = join(homedir(), ".config", "revi", "prompts");
   }
 
   render(name: string, vars: Record<string, unknown>): string {
@@ -158,13 +154,15 @@ export class PromptRegistry {
   private loadSource(name: string): string {
     // 1. プロジェクト固有
     if (this.projectDir) {
-      const path = resolve(this.projectDir, ".revi", "prompts", `${name}.md`);
-      if (existsSync(path)) return readFileSync(path, "utf-8");
+      try {
+        return readFileSync(resolve(this.projectDir, ".revi", "prompts", `${name}.md`), "utf-8");
+      } catch {}
     }
 
     // 2. ユーザー共有
-    const userPath = join(this.userDir, `${name}.md`);
-    if (existsSync(userPath)) return readFileSync(userPath, "utf-8");
+    try {
+      return readFileSync(join(this.userDir, `${name}.md`), "utf-8");
+    } catch {}
 
     // 3. ビルトイン
     if (BUILTIN_PROMPTS[name]) return BUILTIN_PROMPTS[name];

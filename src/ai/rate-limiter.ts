@@ -39,12 +39,12 @@ export class RateLimiter {
 
     this.resetWindowsIfNeeded();
 
-    // 時間あたりレビュー数チェック
-    const recentCalls = this.callTimestamps.filter(
+    // Prune old timestamps and check hourly limit
+    this.callTimestamps = this.callTimestamps.filter(
       (t) => Date.now() - t < 3600_000
     );
-    if (recentCalls.length >= this.config.max_reviews_per_hour) {
-      const oldestInWindow = Math.min(...recentCalls);
+    if (this.callTimestamps.length >= this.config.max_reviews_per_hour) {
+      const oldestInWindow = Math.min(...this.callTimestamps);
       const waitMs = oldestInWindow + 3600_000 - Date.now();
       await sleep(waitMs);
     }
