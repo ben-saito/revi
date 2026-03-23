@@ -1,5 +1,4 @@
 import { resolve, join } from "path";
-import { existsSync } from "fs";
 import { Store } from "../../store/db";
 import chalk from "chalk";
 
@@ -13,12 +12,13 @@ export function historyCommand(opts: HistoryOptions) {
   const root = resolve(opts.projectDir);
   const dbPath = join(root, ".revi", "db.sqlite");
 
-  if (!existsSync(dbPath)) {
+  let store: Store;
+  try {
+    store = new Store(dbPath);
+  } catch {
     console.error(chalk.red("✗ No review history found. Run `revi init` and `revi review` first."));
     process.exit(1);
   }
-
-  const store = new Store(dbPath);
 
   try {
     const limit = parseInt(opts.limit, 10) || 10;

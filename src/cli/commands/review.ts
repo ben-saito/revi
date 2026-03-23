@@ -107,7 +107,7 @@ export async function reviewCommand(opts: ReviewOptions) {
   }
 }
 
-function printTerminal(
+export function printTerminal(
   findings: Array<{ severity: string; title: string; file: string; line_start?: number; description: string; confidence: number }>,
   tokensUsed: number
 ) {

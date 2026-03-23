@@ -140,6 +140,24 @@ export interface ProjectConfig {
   };
 }
 
+// --- Store query result ---
+
+export interface ReviewRecord {
+  id: string;
+  project: string;
+  status: string;
+  source: string;
+  base_ref: string;
+  head_ref: string;
+  created_at: string;
+}
+
+export interface ReviewListItem extends ReviewRecord {
+  finding_count: number;
+  critical_count: number;
+  warning_count: number;
+}
+
 // --- Review Report ---
 
 export interface ReviewReport {

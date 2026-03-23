@@ -1,8 +1,8 @@
 import { resolve, join } from "path";
-import { existsSync } from "fs";
 import { Store } from "../../store/db";
 import { buildReport, formatMarkdown } from "../../pipeline/stages/report";
 import { SEVERITY_ORDER } from "../../utils";
+import { printTerminal } from "./review";
 import type { Severity } from "../../pipeline/types";
 import chalk from "chalk";
 
@@ -16,12 +16,13 @@ export function showCommand(reviewId: string, opts: ShowOptions) {
   const root = resolve(opts.projectDir);
   const dbPath = join(root, ".revi", "db.sqlite");
 
-  if (!existsSync(dbPath)) {
+  let store: Store;
+  try {
+    store = new Store(dbPath);
+  } catch {
     console.error(chalk.red("✗ No review history found. Run `revi init` and `revi review` first."));
     process.exit(1);
   }
-
-  const store = new Store(dbPath);
 
   try {
     let review;
@@ -67,32 +68,7 @@ export function showCommand(reviewId: string, opts: ShowOptions) {
         console.log(chalk.gray(`  Diff:     ${ref}`));
         console.log(chalk.gray(`  Date:     ${review.created_at}`));
         console.log("");
-
-        if (findings.length === 0) {
-          console.log(chalk.green("✓ No issues found"));
-          console.log(chalk.gray(`  Tokens used: ${tokensUsed.toLocaleString()}`));
-          return;
-        }
-
-        const icons: Record<string, string> = {
-          critical: chalk.red("●"),
-          warning: chalk.yellow("●"),
-          suggestion: chalk.blue("●"),
-          info: chalk.gray("●"),
-        };
-
-        console.log(chalk.bold(`Found ${findings.length} issue(s):\n`));
-
-        for (const f of findings) {
-          const icon = icons[f.severity] ?? "○";
-          const loc = f.line_start ? `${f.file}:${f.line_start}` : f.file;
-          console.log(`${icon} ${chalk.bold(f.title)}`);
-          console.log(chalk.gray(`  ${loc} | ${f.severity} | confidence: ${f.confidence}`));
-          console.log(`  ${f.description}`);
-          console.log("");
-        }
-
-        console.log(chalk.gray(`Tokens used: ${tokensUsed.toLocaleString()}`));
+        printTerminal(findings, tokensUsed);
         break;
       }
     }

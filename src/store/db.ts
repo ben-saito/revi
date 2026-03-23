@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import type { Finding, ReviewMeta, Severity } from "../pipeline/types";
+import type { Finding, ReviewMeta, ReviewRecord, ReviewListItem, Severity } from "../pipeline/types";
 import { SEVERITY_ORDER, type ReviewStatus } from "../utils";
 
 const SCHEMA = `
@@ -43,8 +43,10 @@ CREATE TABLE IF NOT EXISTS findings (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_findings_review ON findings(review_id);
+CREATE INDEX IF NOT EXISTS idx_findings_review ON findings(review_id, suppressed);
 CREATE INDEX IF NOT EXISTS idx_findings_severity ON findings(severity);
+CREATE INDEX IF NOT EXISTS idx_pipeline_runs_review ON pipeline_runs(review_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_created ON reviews(created_at DESC);
 `;
 
 export class Store {
@@ -119,13 +121,12 @@ export class Store {
   }
 
   getFindings(reviewId: string, minSeverity?: Severity): Finding[] {
-    const severityOrder = SEVERITY_ORDER;
     let query = `SELECT * FROM findings WHERE review_id = ? AND suppressed = 0`;
     const params: unknown[] = [reviewId];
 
     if (minSeverity) {
-      const idx = severityOrder.indexOf(minSeverity);
-      const allowed = severityOrder.slice(0, idx + 1);
+      const idx = SEVERITY_ORDER.indexOf(minSeverity);
+      const allowed = SEVERITY_ORDER.slice(0, idx + 1);
       query += ` AND severity IN (${allowed.map(() => "?").join(",")})`;
       params.push(...allowed);
     }
@@ -148,18 +149,8 @@ export class Store {
     }));
   }
 
-  listReviews(limit: number): Array<{
-    id: string;
-    project: string;
-    status: string;
-    source: string;
-    base_ref: string;
-    head_ref: string;
-    created_at: string;
-    finding_count: number;
-    critical_count: number;
-    warning_count: number;
-  }> {
+  listReviews(limit: number): ReviewListItem[] {
+    const clampedLimit = Math.min(Math.max(limit, 1), 1000);
     const rows = this.db
       .prepare(
         `SELECT r.id, r.project, r.status, r.source, r.base_ref, r.head_ref, r.created_at,
@@ -172,7 +163,7 @@ export class Store {
          ORDER BY r.created_at DESC
          LIMIT ?`
       )
-      .all(limit) as Record<string, unknown>[];
+      .all(clampedLimit) as Record<string, unknown>[];
 
     return rows.map((r) => ({
       id: r.id as string,
@@ -188,23 +179,16 @@ export class Store {
     }));
   }
 
-  getReview(id: string): {
-    id: string;
-    project: string;
-    status: string;
-    source: string;
-    base_ref: string;
-    head_ref: string;
-    created_at: string;
-  } | null {
-    // Require at least 8 characters for prefix matching to avoid ambiguous results
+  getReview(id: string): ReviewRecord | null {
     if (id.length < 8) {
       throw new Error(`Review ID must be at least 8 characters (got ${id.length})`);
     }
 
+    // Use range query for efficient prefix matching on indexed PRIMARY KEY
+    const upperBound = id.slice(0, -1) + String.fromCharCode(id.charCodeAt(id.length - 1) + 1);
     const rows = this.db
-      .prepare(`SELECT * FROM reviews WHERE id LIKE ? || '%' LIMIT 2`)
-      .all(id) as Record<string, unknown>[];
+      .prepare(`SELECT * FROM reviews WHERE id >= ? AND id < ? LIMIT 2`)
+      .all(id, upperBound) as Record<string, unknown>[];
 
     if (rows.length === 0) return null;
     if (rows.length > 1) {
