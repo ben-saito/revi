@@ -10,7 +10,7 @@ const DEFAULT_CONFIG: ProjectConfig = {
     default: "claude-code",
   },
   pipeline: {
-    stages: ["parse", "understand", "review", "integrate", "report"],
+    stages: ["parse", "understand", "review", "cross-review", "consistency", "integrate", "report"],
     timeout: 300,
   },
   review: {
@@ -69,7 +69,7 @@ default = "claude-code"
 # api_key_env = "ANTHROPIC_API_KEY"
 
 [pipeline]
-stages = ["parse", "understand", "review", "integrate", "report"]
+stages = ["parse", "understand", "review", "cross-review", "consistency", "integrate", "report"]
 # timeout = 300
 
 [review]
