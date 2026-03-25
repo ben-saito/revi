@@ -14,12 +14,16 @@ import { ParseStage } from "./stages/parse";
 import { UnderstandStage } from "./stages/understand";
 import { ReviewStage } from "./stages/review";
 import { IntegrateStage } from "./stages/integrate";
+import { CrossReviewStage } from "./stages/cross-review";
+import { ConsistencyStage } from "./stages/consistency";
 import { ReportStage } from "./stages/report";
 
 const BUILTIN_STAGES: Record<string, () => Stage> = {
   parse: () => new ParseStage(),
   understand: () => new UnderstandStage(),
   review: () => new ReviewStage(),
+  "cross-review": () => new CrossReviewStage(),
+  consistency: () => new ConsistencyStage(),
   integrate: () => new IntegrateStage(),
   report: () => new ReportStage(),
 };
